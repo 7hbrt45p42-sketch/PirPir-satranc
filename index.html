@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no">
+  <title>Pır Pır Satranç</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0d0907; overflow: hidden;
+                 font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    #game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: #140d0a; outline: none; }
+    #loader { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+              background: radial-gradient(ellipse at center, #2a1a12 0%, #0d0907 70%); color: #fff; z-index: 10;
+              transition: opacity .5s; }
+    #loader h1 { margin: 0 0 6px; font-size: clamp(34px, 7vw, 72px); letter-spacing: 2px; text-shadow: 0 3px 0 #0a3a5a; }
+    #loader h1 span { color: #ffe98c; }
+    #loader p { margin: 0 0 28px; font-size: clamp(14px, 2.2vw, 22px); color: #b8e0ff; }
+    #bar { width: min(420px, 70vw); height: 14px; border-radius: 8px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #fill { width: 0%; height: 100%; background: linear-gradient(90deg, #0aa89e, #1e73c2); transition: width .2s; }
+    #msg { margin-top: 14px; font-size: 14px; color: #9fb4c4; }
+    #fs { position: fixed; left: 14px; bottom: 12px; z-index: 5; padding: 8px 14px; border-radius: 10px; border: 0;
+          background: rgba(0,0,0,.45); color: #fff; font-size: 14px; cursor: pointer; }
+    #fs:hover { background: rgba(0,0,0,.7); }
+    #err { position: fixed; left: 0; right: 0; bottom: 0; background: #a00; color: #fff; padding: 10px; display: none; z-index: 20; }
+  </style>
+</head>
+<body>
+  <canvas id="game" tabindex="-1"></canvas>
+  <button id="fs" title="Tam ekran">Tam ekran</button>
+  <div id="loader">
+    <h1>PIR PIR <span>SATRANÇ</span></h1>
+    <p>Her Hamlede Bir Hikâye!</p>
+    <div id="bar"><div id="fill"></div></div>
+    <div id="msg">Oyun yükleniyor... (ilk açılışta biraz sürebilir)</div>
+  </div>
+  <div id="err"></div>
+
+  <script src="Build/WebGL.loader.js"></script>
+  <script>
+    var canvas = document.getElementById("game");
+    var config = {
+      arguments: [],
+      dataUrl: "Build/WebGL.data.unityweb",
+      frameworkUrl: "Build/WebGL.framework.js.unityweb",
+      codeUrl: "Build/WebGL.wasm.unityweb",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "Beylikduzu Belediyesi",
+      productName: "Pir Pir Satranc",
+      productVersion: "1.0",
+      matchWebGLToCanvasSize: true,
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      showBanner: function (msg, type) {
+        if (type === "error") { var e = document.getElementById("err"); e.style.display = "block"; e.innerHTML = msg; }
+      }
+    };
+    var instance = null;
+    createUnityInstance(canvas, config, function (progress) {
+      document.getElementById("fill").style.width = (100 * progress) + "%";
+      if (progress >= 0.999) document.getElementById("msg").textContent = "Başlatılıyor...";
+    }).then(function (u) {
+      instance = u;
+      var l = document.getElementById("loader");
+      l.style.opacity = 0;
+      setTimeout(function () { l.style.display = "none"; }, 600);
+      canvas.focus();
+    }).catch(function (m) {
+      document.getElementById("msg").textContent = "Oyun açılamadı: " + m;
+    });
+    document.getElementById("fs").onclick = function () { if (instance) instance.SetFullscreen(1); };
+    // Oyun penceresine tıklayınca klavye odağı oyuna geçsin
+    window.addEventListener("click", function () { canvas.focus(); });
+  </script>
+</body>
+</html>
