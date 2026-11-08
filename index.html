@@ -17,17 +17,22 @@
     #bar { width: min(420px, 70vw); height: 14px; border-radius: 8px; background: rgba(255,255,255,.12); overflow: hidden; }
     #fill { width: 0%; height: 100%; background: linear-gradient(90deg, #0aa89e, #1e73c2); transition: width .2s; }
     #msg { margin-top: 14px; font-size: 14px; color: #9fb4c4; }
-    #fs { position: fixed; left: 14px; bottom: 12px; z-index: 5; padding: 8px 14px; border-radius: 10px; border: 0;
-          background: rgba(0,0,0,.45); color: #fff; font-size: 14px; cursor: pointer; }
-    #fs:hover { background: rgba(0,0,0,.7); }
+    /* Oyun hazır olunca çıkan BAŞLA düğmesi (ilk ziyaret) */
+    #startBtn { display: none; padding: 16px 64px; border-radius: 16px; border: 0; cursor: pointer;
+                background: linear-gradient(180deg, #17b5a8, #0e8f86); color: #fff; font-size: clamp(22px, 3.4vw, 32px);
+                font-weight: 800; letter-spacing: 2px; box-shadow: 0 6px 0 #096a63, 0 10px 28px rgba(0,0,0,.45);
+                animation: pulse 1.6s ease-in-out infinite; }
+    #startBtn:hover { filter: brightness(1.1); }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    .small { position: fixed; bottom: 12px; z-index: 5; padding: 8px 14px; border-radius: 10px; border: 0;
+             background: rgba(0,0,0,.45); color: #fff; font-size: 14px; cursor: pointer; }
+    .small:hover { background: rgba(0,0,0,.7); }
+    #fs { left: 14px; }
+    #replay { left: 168px; display: none; }
     #err { position: fixed; left: 0; right: 0; bottom: 0; background: #a00; color: #fff; padding: 10px; display: none; z-index: 20; }
-    /* Açılış fragmanı */
-    #intro { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; align-items: center; justify-content: center; }
+    /* Fragman katmanı */
+    #intro { position: fixed; inset: 0; z-index: 30; background: #000; display: none; align-items: center; justify-content: center; }
     #introVideo { width: 100%; height: 100%; object-fit: contain; background: #000; }
-    #introStart { position: absolute; inset: 0; margin: auto; width: 200px; height: 200px; max-width: 40vw; max-height: 40vw;
-                  border-radius: 50%; border: 0; background: rgba(30,115,194,.92); color: #fff; font-size: 22px; font-weight: 700;
-                  cursor: pointer; display: none; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
-    #introStart:hover { background: rgba(10,168,158,.95); }
     #introSkip { position: absolute; right: 18px; bottom: 18px; padding: 12px 22px; border-radius: 12px; border: 2px solid rgba(255,255,255,.7);
                  background: rgba(0,0,0,.55); color: #fff; font-size: 18px; font-weight: 700; letter-spacing: 1px; cursor: pointer; }
     #introSkip:hover { background: rgba(255,255,255,.25); }
@@ -35,19 +40,20 @@
 </head>
 <body>
   <canvas id="game" tabindex="-1"></canvas>
-  <button id="fs" title="Tam ekran">Tam ekran &middot; v14</button>
+  <button id="fs" class="small" title="Tam ekran">Tam ekran &middot; v15</button>
+  <button id="replay" class="small" title="Fragmanı izle">&#9654; Fragman</button>
   <div id="loader">
     <h1>PIR PIR <span>SATRANÇ</span></h1>
     <p>Her Hamlede Bir Hikâye!</p>
     <div id="bar"><div id="fill"></div></div>
+    <button id="startBtn">BAŞLA</button>
     <div id="msg">Oyun yükleniyor... (ilk açılışta biraz sürebilir)</div>
   </div>
   <div id="err"></div>
 
-  <!-- Açılış fragmanı: oyun yüklenirken oynar, ATLA ile geçilebilir -->
+  <!-- Açılış fragmanı: ilk ziyarette BAŞLA'dan sonra oynar, ATLA ile geçilir, ▶ Fragman ile yeniden izlenir -->
   <div id="intro">
-    <video id="introVideo" src="fragman.mp4?v=14" playsinline preload="auto"></video>
-    <button id="introStart" aria-label="Fragmanı başlat">&#9654;<br>İZLE</button>
+    <video id="introVideo" src="fragman.mp4?v=14" playsinline preload="none"></video>
     <button id="introSkip" aria-label="Fragmanı atla">ATLA &#9654;&#9654;</button>
   </div>
 
@@ -69,64 +75,82 @@
         if (type === "error") { var e = document.getElementById("err"); e.style.display = "block"; e.innerHTML = msg; }
       }
     };
+
+    // ---- Fragman akışı ----
+    var SEEN_KEY = "pp_intro_seen";
+    function introSeen() { try { return localStorage.getItem(SEEN_KEY) === "1"; } catch (e) { return false; } }
+    function markSeen() { try { localStorage.setItem(SEEN_KEY, "1"); } catch (e) {} }
+
+    var loader = document.getElementById("loader");
+    var intro = document.getElementById("intro");
+    var vid = document.getElementById("introVideo");
+    var startBtn = document.getElementById("startBtn");
+    var replayBtn = document.getElementById("replay");
+    var skipBtn = document.getElementById("introSkip");
+    var introOpen = false;
+
+    function hideLoader() {
+      loader.style.opacity = 0;
+      setTimeout(function () { loader.style.display = "none"; }, 600);
+    }
+    function openIntro() {            // yalnızca tıklama içinden çağrılır (sesli oynatma izni)
+      introOpen = true;
+      intro.style.transition = "none";
+      intro.style.opacity = 1;
+      intro.style.display = "flex";
+      try { vid.currentTime = 0; } catch (e) {}
+      var p = vid.play();
+      if (p && p.catch) p.catch(function () { closeIntro(); });   // oynatılamazsa oyuna geç
+    }
+    function closeIntro() {
+      if (!introOpen) return;
+      introOpen = false;
+      markSeen();
+      try { vid.pause(); } catch (e) {}
+      intro.style.transition = "opacity .4s";
+      intro.style.opacity = 0;
+      setTimeout(function () { intro.style.display = "none"; canvas.focus(); }, 420);
+    }
+
+    skipBtn.addEventListener("click", function (e) { e.stopPropagation(); closeIntro(); });
+    vid.addEventListener("ended", closeIntro);
+    vid.addEventListener("error", function () { introOpen = true; closeIntro(); });   // fragman açılmazsa oyuna geç
+    window.addEventListener("keydown", function (e) {
+      if (!introOpen) return;
+      if (e.key === "Escape" || e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); closeIntro(); }
+    }, true);
+
+    startBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      hideLoader();
+      openIntro();
+    });
+    replayBtn.addEventListener("click", function (e) { e.stopPropagation(); openIntro(); });
+
+    // ---- Oyunu yükle ----
     var instance = null;
     createUnityInstance(canvas, config, function (progress) {
       document.getElementById("fill").style.width = (100 * progress) + "%";
       if (progress >= 0.999) document.getElementById("msg").textContent = "Başlatılıyor...";
     }).then(function (u) {
       instance = u;
-      var l = document.getElementById("loader");
-      l.style.opacity = 0;
-      setTimeout(function () { l.style.display = "none"; }, 600);
-      canvas.focus();
+      replayBtn.style.display = "block";
+      vid.preload = "auto";           // oyun hazır, fragmanı arka planda indirmeye başla
+      vid.load();
+      if (introSeen()) {              // daha önce izlediyse doğrudan oyuna
+        hideLoader();
+        canvas.focus();
+      } else {                        // ilk ziyaret: BAŞLA düğmesi çıksın
+        document.getElementById("bar").style.display = "none";
+        document.getElementById("msg").style.display = "none";
+        startBtn.style.display = "block";
+      }
     }).catch(function (m) {
       document.getElementById("msg").textContent = "Oyun açılamadı: " + m;
     });
     document.getElementById("fs").onclick = function () { if (instance) instance.SetFullscreen(1); };
-
-    // ---- Açılış fragmanı ----
-    (function () {
-      var intro = document.getElementById("intro");
-      var vid = document.getElementById("introVideo");
-      var startBtn = document.getElementById("introStart");
-      var skipBtn = document.getElementById("introSkip");
-      var closed = false;
-
-      function closeIntro() {
-        if (closed) return;
-        closed = true;
-        try { vid.pause(); } catch (e) {}
-        vid.removeAttribute("src");
-        vid.load();                      // sesi tamamen bırak
-        intro.style.transition = "opacity .4s";
-        intro.style.opacity = 0;
-        setTimeout(function () { intro.style.display = "none"; canvas.focus(); }, 420);
-      }
-
-      function tryPlay() {
-        var p = vid.play();
-        if (p && p.catch) {
-          p.catch(function () { startBtn.style.display = "block"; });  // tarayıcı sesli otomatik oynatmayı engelledi
-        }
-      }
-
-      skipBtn.addEventListener("click", function (e) { e.stopPropagation(); closeIntro(); });
-      startBtn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        startBtn.style.display = "none";
-        vid.play().catch(function () { closeIntro(); });
-      });
-      vid.addEventListener("ended", closeIntro);
-      vid.addEventListener("error", closeIntro);   // fragman açılmazsa oyuna geç
-      window.addEventListener("keydown", function (e) {
-        if (closed) return;
-        if (e.key === "Escape" || e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); closeIntro(); }
-      }, true);
-
-      tryPlay();
-    })();
     // Oyun penceresine tıklayınca klavye odağı oyuna geçsin
-    window.addEventListener("click", function () { canvas.focus(); });
+    window.addEventListener("click", function () { if (!introOpen) canvas.focus(); });
   </script>
 </body>
 </html>
